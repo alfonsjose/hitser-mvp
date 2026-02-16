@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Hitser",
+    "slug": "hitser",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "hitser",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f0d1a"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f0d1a"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
