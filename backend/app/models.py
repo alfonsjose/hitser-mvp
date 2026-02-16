@@ -55,6 +55,7 @@ class GameState(BaseModel):
 class CreateGameRequest(BaseModel):
     player_names: list[str]
     rounds_per_player: int = 10
+    genres: list[str] = Field(default_factory=list)  # empty = all genres
 
 
 class PlaceRequest(BaseModel):

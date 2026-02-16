@@ -30,6 +30,14 @@ def _load_songs() -> list[dict]:
         return json.load(f)
 
 
+def get_available_genres() -> list[str]:
+    """Return sorted list of unique genres from the song list."""
+    songs = _load_songs()
+    genres = {s.get("genre", "").strip().lower() for s in songs}
+    genres.discard("")
+    return sorted(genres)
+
+
 def create_game(req: CreateGameRequest) -> GameState:
     """Create a new game with the given players and settings."""
     if len(req.player_names) < 2 or len(req.player_names) > 8:
@@ -38,6 +46,17 @@ def create_game(req: CreateGameRequest) -> GameState:
         raise ValueError("Rounds per player must be 10, 15, or 20")
 
     all_songs = _load_songs()
+
+    # Filter by genres if specified
+    if req.genres:
+        selected = {g.strip().lower() for g in req.genres}
+        all_songs = [
+            s for s in all_songs
+            if s.get("genre", "").strip().lower() in selected
+        ]
+        if not all_songs:
+            raise ValueError("No songs match the selected genres")
+
     total_needed = len(req.player_names) * req.rounds_per_player
     if len(all_songs) < total_needed:
         # Use what we have, possibly with repeats for very large games

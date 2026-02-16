@@ -1,6 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createGame } from '../api';
+import { createGame, getGenres } from '../api';
+
+const GENRE_LABELS: Record<string, string> = {
+  'pop': 'Pop',
+  'rock': 'Rock',
+  'hip-hop': 'Hip-Hop',
+  'r&b': 'R&B',
+  'electronic': 'Electronic',
+  'soul': 'Soul',
+  'disco': 'Disco',
+  'funk': 'Funk',
+  'jazz': 'Jazz',
+  'folk': 'Folk',
+  'country': 'Country',
+  'latin': 'Latin',
+  'k-pop': 'K-Pop',
+  'afrobeats': 'Afrobeats',
+};
+
+function genreLabel(g: string) {
+  return GENRE_LABELS[g] || g.charAt(0).toUpperCase() + g.slice(1);
+}
 
 export default function SetupScreen() {
   const navigate = useNavigate();
@@ -8,6 +29,19 @@ export default function SetupScreen() {
   const [rounds, setRounds] = useState(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [availableGenres, setAvailableGenres] = useState<string[]>([]);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]); // empty = all (default)
+  const [useAllGenres, setUseAllGenres] = useState(true);
+
+  useEffect(() => {
+    getGenres().then(res => setAvailableGenres(res.genres)).catch(() => {});
+  }, []);
+
+  const toggleGenre = (genre: string) => {
+    setSelectedGenres(prev =>
+      prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
+    );
+  };
 
   const addPlayer = () => {
     if (playerNames.length < 8) {
@@ -33,10 +67,14 @@ export default function SetupScreen() {
       setError('Need at least 2 players');
       return;
     }
+    if (!useAllGenres && selectedGenres.length === 0) {
+      setError('Select at least one genre');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      const game = await createGame(names, rounds);
+      const game = await createGame(names, rounds, useAllGenres ? [] : selectedGenres);
       navigate(`/game/${game.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create game');
@@ -116,6 +154,59 @@ export default function SetupScreen() {
             ))}
           </div>
         </div>
+
+        {/* Genre Selection */}
+        {availableGenres.length > 0 && (
+          <div className="bg-[#1e1b2e] rounded-2xl p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4 text-gray-200">Music Genres</h2>
+
+            {/* All / Custom toggle */}
+            <div className="flex gap-3 mb-4">
+              <button
+                onClick={() => setUseAllGenres(true)}
+                className={`flex-1 py-2 rounded-lg font-medium transition-all text-sm ${
+                  useAllGenres
+                    ? 'bg-[#7c3aed] text-white shadow-lg shadow-[#7c3aed]/25'
+                    : 'bg-[#2a2540] text-gray-400 hover:text-white'
+                }`}
+              >
+                All Songs
+              </button>
+              <button
+                onClick={() => setUseAllGenres(false)}
+                className={`flex-1 py-2 rounded-lg font-medium transition-all text-sm ${
+                  !useAllGenres
+                    ? 'bg-[#7c3aed] text-white shadow-lg shadow-[#7c3aed]/25'
+                    : 'bg-[#2a2540] text-gray-400 hover:text-white'
+                }`}
+              >
+                Pick Genres
+              </button>
+            </div>
+
+            {/* Genre chips */}
+            {!useAllGenres && (
+              <div className="flex flex-wrap gap-2">
+                {availableGenres.map(genre => (
+                  <button
+                    key={genre}
+                    onClick={() => toggleGenre(genre)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      selectedGenres.includes(genre)
+                        ? 'bg-[#06b6d4] text-white shadow-md shadow-[#06b6d4]/25'
+                        : 'bg-[#2a2540] text-gray-400 hover:text-white hover:bg-[#3a3455]'
+                    }`}
+                  >
+                    {genreLabel(genre)}
+                  </button>
+                ))}
+                {!useAllGenres && selectedGenres.length === 0 && (
+                  <p className="text-yellow-400/70 text-xs mt-1 w-full">Select at least one genre</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <p className="text-red-400 text-sm text-center mb-4">{error}</p>

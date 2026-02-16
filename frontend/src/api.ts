@@ -61,10 +61,14 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-export function createGame(playerNames: string[], roundsPerPlayer: number) {
+export function getGenres() {
+  return request<{ genres: string[] }>('/genres');
+}
+
+export function createGame(playerNames: string[], roundsPerPlayer: number, genres: string[]) {
   return request<GameSummary>('/game', {
     method: 'POST',
-    body: JSON.stringify({ player_names: playerNames, rounds_per_player: roundsPerPlayer }),
+    body: JSON.stringify({ player_names: playerNames, rounds_per_player: roundsPerPlayer, genres }),
   });
 }
 

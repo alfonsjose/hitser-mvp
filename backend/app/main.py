@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .game import (
     advance_turn,
     create_game,
+    get_available_genres,
     get_game,
     get_game_summary,
     place_song,
@@ -27,6 +28,11 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/genres")
+def api_get_genres():
+    return {"genres": get_available_genres()}
 
 
 @app.post("/api/game")
