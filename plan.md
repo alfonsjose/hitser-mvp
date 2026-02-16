@@ -160,3 +160,224 @@ Regardless of approach, these are needed:
 **Option B (Polling)** if you want to ship faster with less risk — simpler code, fewer edge cases, still a solid multi-device experience.
 
 **Option C (Hybrid)** if you want the pragmatic middle ground — ship quickly, upgrade later.
+
+---
+---
+
+# React Native Mobile App — Implementation Plan
+
+## Approach: React Native with Expo
+
+Rebuild the UI with native components for a smooth, native feel on iOS and Android while reusing the same API contract and game logic from the web app.
+
+---
+
+## Project Structure
+
+```
+/mobile/
+├── app/                          # Expo Router file-based routing
+│   ├── _layout.tsx               # Root layout + navigation config
+│   ├── index.tsx                 # SetupScreen (home)
+│   ├── game/[id].tsx             # GameScreen
+│   └── results/[id].tsx          # ResultsScreen
+├── components/
+│   ├── AudioPlayer.tsx           # expo-av based audio player
+│   ├── Timeline.tsx              # Horizontal FlatList timeline
+│   ├── PlacementResult.tsx       # Correct/wrong modal
+│   └── PassScreen.tsx            # "Pass to next player" overlay
+├── api/
+│   └── client.ts                 # Shared API functions + types
+├── constants/
+│   └── colors.ts                 # Color palette
+└── app.json                      # Expo config
+```
+
+---
+
+## Key Dependencies
+
+| Package | Replaces (Web) | Purpose |
+|---|---|---|
+| `expo` | Vite | Build system, dev server |
+| `expo-router` | react-router-dom | File-based navigation |
+| `expo-av` | HTML5 `<audio>` | Song preview playback |
+| `expo-linear-gradient` | CSS `bg-gradient-to-r` | Purple-to-cyan gradients |
+| `@expo/vector-icons` | Inline SVGs | Icons (play, pause, plus, X) |
+| `expo-clipboard` | `navigator.clipboard` | Copy game link |
+| `react-native-reanimated` | CSS transitions | Smooth animations |
+
+No external styling library needed — use React Native `StyleSheet` directly for full control and best performance.
+
+---
+
+## Screen-by-Screen Migration
+
+### 1. SetupScreen (`app/index.tsx`)
+
+**Web → Native mapping:**
+
+| Web Element | React Native Element |
+|---|---|
+| `<input>` | `<TextInput>` |
+| `<button>` | `<Pressable>` |
+| Tailwind `flex gap-3` | `View` with `flexDirection: 'row', gap: 12` |
+| `bg-gradient-to-r` | `<LinearGradient>` |
+| `rounded-2xl` | `borderRadius: 16` |
+| Scroll page | `<ScrollView>` or `<KeyboardAvoidingView>` |
+
+**State** — identical to web:
+- `playerNames`, `rounds`, `genres`, `useAllGenres`, `loading`, `error`
+
+**Key consideration:** Wrap in `KeyboardAvoidingView` so the player name inputs don't get hidden by the on-screen keyboard.
+
+---
+
+### 2. GameScreen (`app/game/[id].tsx`)
+
+**Same state machine, native components:**
+
+| Phase | What Shows |
+|---|---|
+| `loading` | `<ActivityIndicator>` |
+| `pass` | `PassScreen` component (full-screen `<Modal>`) |
+| `auto-placed` | Auto-place modal (`<Modal>`) |
+| `placing` | `AudioPlayer` + `Timeline` (interactive) |
+| `result` | `PlacementResult` modal (`<Modal>`) |
+
+**Audio:** Replace `new Audio(url)` with:
+```typescript
+const { sound } = await Audio.Sound.createAsync({ uri: preview_url });
+await sound.playAsync();
+```
+
+**Timeline:** `<FlatList horizontal>` with `SongCard` items and `DropSlot` separators via `ItemSeparatorComponent`.
+
+---
+
+### 3. ResultsScreen (`app/results/[id].tsx`)
+
+**Podium layout:** Use absolute positioning or flexbox to create the 2nd-1st-3rd podium effect.
+
+**Player timelines:** `<FlatList horizontal>` per player, nested in a vertical `<ScrollView>`.
+
+---
+
+## Component Migration
+
+### AudioPlayer
+
+| Feature | Web | React Native |
+|---|---|---|
+| Playback | `HTMLAudioElement` | `expo-av` `Audio.Sound` |
+| Progress bar | `<div>` with width % | `<View>` with animated width |
+| Time display | `timeupdate` event | `sound.getStatusAsync()` polling or `setOnPlaybackStatusUpdate` |
+| Auto-play | `audio.play()` | `sound.playAsync()` |
+
+Use `setOnPlaybackStatusUpdate` callback for real-time progress — no polling needed.
+
+### Timeline
+
+| Feature | Web | React Native |
+|---|---|---|
+| Scroll | `overflow-x-auto` div | `<FlatList horizontal>` |
+| Song cards | Styled divs | `<View>` + `<Text>` |
+| Drop slots | Dashed-border buttons | `<Pressable>` with dashed border |
+| Vinyl icon | CSS circles | `<View>` with `borderRadius` |
+
+### PlacementResult
+
+| Feature | Web | React Native |
+|---|---|---|
+| Overlay | Fixed-position div | `<Modal transparent>` |
+| Animation | CSS `@keyframes` | `react-native-reanimated` `FadeIn` |
+| Backdrop | `bg-black/60` | `View` with `backgroundColor: 'rgba(0,0,0,0.6)'` |
+
+### PassScreen
+
+Direct port — just a full-screen `<Modal>` with the player name and "I'm Ready" button.
+
+---
+
+## Color Palette (`constants/colors.ts`)
+
+```typescript
+export const Colors = {
+  background: '#0f0d1a',
+  surface: '#1e1b2e',
+  surfaceLight: '#2a2540',
+  surfaceLighter: '#3a3455',
+  primary: '#7c3aed',
+  primaryLight: '#a78bfa',
+  primaryDark: '#5b21b6',
+  accent: '#06b6d4',
+  accentLight: '#67e8f9',
+  correct: '#22c55e',
+  wrong: '#ef4444',
+  text: '#f1f0f5',
+  textMuted: '#9ca3af',
+  textDim: '#6b7280',
+};
+```
+
+---
+
+## API Client (`api/client.ts`)
+
+Identical logic to web `api.ts` with one change — the base URL:
+
+```typescript
+const API_BASE = __DEV__
+  ? 'http://<LOCAL_IP>:8000/api'   // Expo dev on physical device
+  : 'https://your-production.com/api';
+```
+
+All types (`Song`, `Player`, `GameSummary`, `PlacementResult`, etc.) are copied as-is.
+
+---
+
+## What's Different from the Web App
+
+| Concern | Web | Mobile |
+|---|---|---|
+| **Back button** | Browser back | Android hardware back — handle with `useNavigation` |
+| **Audio focus** | Just works | Need `Audio.setAudioModeAsync({ playsInSilentModeIOS: true })` |
+| **Keyboard** | Auto-handled | `KeyboardAvoidingView` on SetupScreen |
+| **Haptics** | N/A | Add `expo-haptics` feedback on correct/wrong placement |
+| **Status bar** | N/A | Set to light content on dark background |
+| **Safe areas** | N/A | Wrap in `SafeAreaView` for notch/island devices |
+| **Sharing** | `navigator.clipboard` | `expo-sharing` or `Share` API for game links |
+
+---
+
+## Build & Distribution
+
+```bash
+# Development
+npx expo start              # Start dev server
+npx expo start --ios        # iOS simulator
+npx expo start --android    # Android emulator
+
+# Production builds
+npx eas build --platform ios
+npx eas build --platform android
+
+# App Store / Play Store submission
+npx eas submit --platform ios
+npx eas submit --platform android
+```
+
+Requires an Expo account and EAS (Expo Application Services) for production builds.
+
+---
+
+## Implementation Order
+
+1. **Scaffold** — `npx create-expo-app mobile --template blank-typescript`, install deps
+2. **API client + types** — Copy from web, update base URL
+3. **Colors + layout** — Set up root layout, navigation, color constants
+4. **SetupScreen** — Players, rounds, genres (most straightforward port)
+5. **GameScreen** — State machine, audio player, timeline, modals
+6. **ResultsScreen** — Podium, scores, timelines
+7. **Polish** — Haptics, animations, safe areas, keyboard handling
+8. **Test on devices** — iOS + Android physical devices
