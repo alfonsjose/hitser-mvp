@@ -38,6 +38,14 @@ export default function ResultsScreen() {
   const ranked = [...game.players].sort((a, b) => b.score - a.score);
   const winner = ranked[0];
 
+  if (!winner) {
+    return (
+      <View style={s.center}>
+        <Text style={s.loadingText}>No players found</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={s.safe}>
       <ScrollView contentContainerStyle={s.scroll}>

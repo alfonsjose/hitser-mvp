@@ -26,6 +26,14 @@ export default function ResultsScreen() {
   const ranked = [...game.players].sort((a, b) => b.score - a.score);
   const winner = ranked[0];
 
+  if (!winner) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400">No players found</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-4xl mx-auto">

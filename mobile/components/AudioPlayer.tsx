@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import { useAudioPlayer, useAudioPlayerStatus, AudioModule } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import type { Song } from '../api/client';
@@ -11,67 +11,35 @@ interface AudioPlayerProps {
 }
 
 export default function AudioPlayer({ song, hidden }: AudioPlayerProps) {
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(30);
+  const player = useAudioPlayer(song.preview_url ?? '');
+  const status = useAudioPlayerStatus(player);
+  const [audioError, setAudioError] = useState(false);
 
-  const onPlaybackUpdate = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
-    setProgress((status.positionMillis ?? 0) / 1000);
-    if (status.durationMillis) setDuration(status.durationMillis / 1000);
-    if (status.didJustFinish) setPlaying(false);
+  useEffect(() => {
+    AudioModule.setAudioModeAsync({ playsInSilentMode: true });
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      // Unload previous
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
+    if (song.preview_url) {
+      setAudioError(false);
+      try {
+        player.play();
+      } catch {
+        setAudioError(true);
       }
-      setPlaying(false);
-      setProgress(0);
-
-      if (!song.preview_url) return;
-
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: song.preview_url },
-        { shouldPlay: true },
-        onPlaybackUpdate,
-      );
-      if (!mounted) {
-        await sound.unloadAsync();
-        return;
-      }
-      soundRef.current = sound;
-      setPlaying(true);
     }
+  }, [song.id, player]);
 
-    load();
-
-    return () => {
-      mounted = false;
-      soundRef.current?.unloadAsync();
-    };
-  }, [song.id, onPlaybackUpdate]);
-
-  const togglePlay = async () => {
-    const sound = soundRef.current;
-    if (!sound) return;
-    if (playing) {
-      await sound.pauseAsync();
-      setPlaying(false);
+  const togglePlay = () => {
+    if (status.playing) {
+      player.pause();
     } else {
-      await sound.playAsync();
-      setPlaying(true);
+      player.play();
     }
   };
 
+  const progress = (status.currentTime ?? 0) / 1000;
+  const duration = (status.duration ?? 30000) / 1000;
   const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
 
   return (
@@ -96,7 +64,7 @@ export default function AudioPlayer({ song, hidden }: AudioPlayerProps) {
       {/* Controls */}
       <View style={s.controls}>
         <Pressable onPress={togglePlay} style={s.playBtn}>
-          <Ionicons name={playing ? 'pause' : 'play'} size={20} color="#fff" />
+          <Ionicons name={status.playing ? 'pause' : 'play'} size={20} color="#fff" />
         </Pressable>
 
         <View style={s.barTrack}>
@@ -108,6 +76,9 @@ export default function AudioPlayer({ song, hidden }: AudioPlayerProps) {
 
       {!song.preview_url && (
         <Text style={s.noPreview}>No audio preview available for this track</Text>
+      )}
+      {audioError && (
+        <Text style={s.noPreview}>Failed to play audio. Try again.</Text>
       )}
     </View>
   );

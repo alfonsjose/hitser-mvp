@@ -19,6 +19,7 @@ export default function GameScreen() {
   const [result, setResult] = useState<PlacementResultType | null>(null);
   const [autoPlacedSong, setAutoPlacedSong] = useState<Song | null>(null);
   const [error, setError] = useState('');
+  const [isPlacing, setIsPlacing] = useState(false);
 
   // Load game state initially
   useEffect(() => {
@@ -51,7 +52,8 @@ export default function GameScreen() {
   }, [gameId]);
 
   const handlePlace = useCallback(async (position: number) => {
-    if (!gameId || !currentSong) return;
+    if (!gameId || !currentSong || isPlacing) return;
+    setIsPlacing(true);
     try {
       const res = await placeSong(gameId, position);
       setGame(res.game);
@@ -59,8 +61,10 @@ export default function GameScreen() {
       setPhase('result');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setIsPlacing(false);
     }
-  }, [gameId, currentSong]);
+  }, [gameId, currentSong, isPlacing]);
 
   const handleContinueAfterResult = useCallback(async () => {
     if (!gameId) return;
@@ -120,6 +124,14 @@ export default function GameScreen() {
   }
 
   const currentPlayer = game.players[game.current_player_index];
+
+  if (!currentPlayer) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400">Invalid game state</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

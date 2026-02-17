@@ -22,6 +22,7 @@ export default function GameScreen() {
   const [result, setResult] = useState<PlacementResultType | null>(null);
   const [autoPlacedSong, setAutoPlacedSong] = useState<Song | null>(null);
   const [error, setError] = useState('');
+  const [isPlacing, setIsPlacing] = useState(false);
 
   useEffect(() => {
     if (!gameId) return;
@@ -54,7 +55,8 @@ export default function GameScreen() {
 
   const handlePlace = useCallback(
     async (position: number) => {
-      if (!gameId || !currentSong) return;
+      if (!gameId || !currentSong || isPlacing) return;
+      setIsPlacing(true);
       try {
         const res = await placeSong(gameId, position);
         setGame(res.game);
@@ -62,9 +64,11 @@ export default function GameScreen() {
         setPhase('result');
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Error');
+      } finally {
+        setIsPlacing(false);
       }
     },
-    [gameId, currentSong],
+    [gameId, currentSong, isPlacing],
   );
 
   const handleContinueAfterResult = useCallback(async () => {
@@ -122,6 +126,14 @@ export default function GameScreen() {
   }
 
   const currentPlayer = game.players[game.current_player_index];
+
+  if (!currentPlayer) {
+    return (
+      <View style={s.center}>
+        <Text style={s.loadingText}>Invalid game state</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={s.container}>

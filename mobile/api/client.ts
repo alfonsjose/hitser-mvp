@@ -4,7 +4,9 @@ import { Platform } from 'react-native';
 const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const API_BASE = __DEV__
   ? `http://${DEV_HOST}:8000/api`
-  : 'https://your-production.com/api';
+  : (process.env.EXPO_PUBLIC_API_URL ?? 'https://your-production.com/api');
+
+const FETCH_TIMEOUT_MS = 10_000;
 
 // --- Types ---
 
@@ -60,15 +62,27 @@ export interface PlaceResponse {
 // --- API Functions ---
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(err.detail || 'Request failed');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}${url}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(err.detail || 'Request failed');
+    }
+    return res.json();
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your connection.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return res.json();
 }
 
 export function getGenres() {
